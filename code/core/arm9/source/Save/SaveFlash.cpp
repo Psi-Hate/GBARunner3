@@ -275,15 +275,15 @@ bool flash_patchV126(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomA
 
 bool flash_patch512V130(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
-    {
-        return false;
-    }
-    UINT read = 0;
-    if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
-    {
-        return false;
-    }
+    //if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
+    //{
+    //    return false;
+    //}
+    //UINT read = 0;
+    //if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
+    //{
+    //    return false;
+    //}
 
     sPatchInfo.progSectorPtr = *(u32**)(tempBuffer + FLASH_512V130_OFFSET_PROG_SECTOR);
     sPatchInfo.progBytePtr = nullptr;
@@ -306,15 +306,15 @@ bool flash_patch512V130(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagR
 
 bool flash_patch1MV102(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
-    {
-        return false;
-    }
-    UINT read = 0;
-    if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
-    {
-        return false;
-    }
+    //if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
+    //{
+    //    return false;
+    //}
+    //UINT read = 0;
+    //if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
+    //{
+    //    return false;
+    //}
 
     sPatchInfo.progSectorPtr = *(u32**)(tempBuffer + FLASH_1MV102_OFFSET_PROG_SECTOR);
     sPatchInfo.progBytePtr = nullptr;
@@ -342,15 +342,15 @@ bool flash_patch1MV102(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRo
 
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
-    {
-        return false;
-    }
-    UINT read = 0;
-    if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
-    {
-        return false;
-    }
+    //if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
+    //{
+    //    return false;
+    //}
+    //UINT read = 0;
+    //if (f_read(romFile, tempBuffer, 0x94, &read) != FR_OK || read != 0x94)
+    //{
+    //    return false;
+    //}
 
     sPatchInfo.progSectorPtr = *(u32**)(tempBuffer + FLASH_1MV103_OFFSET_PROG_SECTOR);
     sPatchInfo.progBytePtr = *(u32**)(tempBuffer + FLASH_1MV103_OFFSET_PROG_BYTE);

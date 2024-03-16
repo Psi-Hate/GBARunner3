@@ -6,6 +6,7 @@
 #include "cp15.h"
 #include "Cpsr.h"
 #include "SdCache.h"
+#include "MemCopy.h"
 
 typedef struct
 {
@@ -98,12 +99,6 @@ static u32 getSdSectorOfRomBlock(u32 romBlock)
 /// @param dst The destination buffer.
 static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
 {
-    u32 sector = getSdSectorOfRomBlock(romBlock);
-    if (sector == 0)
-    {
-        return &sdc_cache[0][0];
-    }
-
     u32 irqs = fs_waitForCompletionOfCurrentTransaction(true);
     if (isCurrentlyFetching())
     {
@@ -147,21 +142,17 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
         sCacheBlockToRomBlock[cacheBlock] = SDC_ROM_BLOCK_INVALID;
     }
 
-    FsWaitToken waitToken;
-    fs_readCacheAlignedSectorsAsync(
-        gFile.obj.fs->pdrv == DEV_FAT ? FS_DEVICE_DLDI : FS_DEVICE_DSI_SD,
-        &sdc_cache[cacheBlock][0], sector,
-        SDC_BLOCK_SIZE / 512, &waitToken);
     sCurrentFetch.romBlock = romBlock;
     sCurrentFetch.cacheBlock = cacheBlock;
 
     if ((arm_getCpsr() & 0x1F) != 0x12)
     {
+        arm_disableIrqs();
         sTabuBlock = cacheBlock;
     }
-
     arm_restoreIrqs(irqs);
-    irqs = fs_waitForCompletion(&waitToken, true);
+    mem_copy32((void*)(0x08000000 + (romBlock * SDC_BLOCK_SIZE)), &sdc_cache[cacheBlock][0], SDC_BLOCK_SIZE);
+    arm_disableIrqs();
     if (sCurrentFetch.romBlock == romBlock)
     {
         finishFetch();
@@ -170,7 +161,6 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
     arm_restoreIrqs(irqs);
     return &sdc_cache[cacheBlock][0];
 }
-
 extern void logAddress(u32 address);
 
 const void* sdc_loadRomBlockDirect(u32 romAddress)
@@ -220,11 +210,11 @@ void sdc_init(void)
     gSdCacheIrqForbiddenRomBlockReplacementRange = 0;
 
     sClusterTable[0] = sizeof(sClusterTable) / sizeof(DWORD);
-    gFile.cltbl = sClusterTable;
-    u32 result = f_lseek(&gFile, CREATE_LINKMAP);
-    if (result != FR_OK)
-    {
-        logAddress(0xDEADBEEF);
-        logAddress(result);
-    }
+    //gFile.cltbl = sClusterTable;
+    //u32 result = f_lseek(&gFile, CREATE_LINKMAP);
+    //if (result != FR_OK)
+    //{
+    //    logAddress(0xDEADBEEF);
+    //    logAddress(result);
+    //}
 }

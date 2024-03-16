@@ -12,6 +12,7 @@
 #include "IpcChannels.h"
 #include "GbaSaveIpcCommand.h"
 #include "Save.h"
+#include "MemCopy.h"
 
 #define DEFAULT_SAVE_SIZE   (32 * 1024)
 
@@ -29,10 +30,14 @@ static u32 sSkipSaveCheckInstruction;
 
 bool sav_tryPatchFunction(const u32* signature, u32 saveSwiNumber, void* patchFunction)
 {
+    u32 cur = *(u32*)(void*)(0x08000000u + 0x1DFB3C);
+    u32 cur2 = *(u32*)(void*)(ROM_LINEAR_DS_ADDRESS + 0x1DFB3C);
+    //if(cur == 0x4A07B510u && cur2 == 0x4A07B510u) while(1);
     u32* function = (u32*)mem_fastSearch16((const u32*)ROM_LINEAR_DS_ADDRESS, ROM_LINEAR_SIZE, signature);
-    if (!function)
+    if (!function) {
+        //while(1);
         return false;
-
+    }
     sav_swiTable[saveSwiNumber] = patchFunction;
     *(u16*)function = SAVE_THUMB_SWI(saveSwiNumber);
     return true;
@@ -55,6 +60,32 @@ static void fillSaveFile(u32 start, u32 end)
         f_write(&gSaveFile, &saveFill, 1, &written);
     }
     f_sync(&gSaveFile);
+}
+
+void fillDebugBuf(void* buf, u32 size, const char* filePath)
+{
+    FIL gDebugBuf;
+    memset(&gDebugBuf, 0, sizeof(gDebugBuf));
+    if (f_open(&gDebugBuf, filePath, FA_OPEN_EXISTING | FA_READ | FA_WRITE) == FR_OK)
+    {
+        f_lseek(&gDebugBuf, 0);
+        for (u32 i = 0; i < size; ++i)
+        {
+            const u32 data = *(u32*)(void*)(buf + i);
+            UINT written = 0;
+            f_write(&gDebugBuf, &data, 1, &written);
+        }
+        f_sync(&gDebugBuf);
+    } else if (f_open(&gDebugBuf, filePath, FA_CREATE_NEW | FA_OPEN_EXISTING | FA_READ | FA_WRITE) == FR_OK){
+        f_lseek(&gDebugBuf, 0);
+        for (u32 i = 0; i < size; ++i)
+        {
+            const u32 data = *(u32*)(void*)(buf + i);
+            UINT written = 0;
+            f_write(&gDebugBuf, &data, 1, &written);
+        }
+        f_sync(&gDebugBuf);
+    }
 }
 
 void sav_initializeSave(const SaveTypeInfo* saveTypeInfo, const char* savePath)

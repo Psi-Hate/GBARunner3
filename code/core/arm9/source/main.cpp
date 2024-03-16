@@ -44,6 +44,7 @@
 #include "Emulator/BootAnimationSkip.h"
 #include "MemoryEmulator/Arm/ArmDispatchTable.h"
 #include "VirtualMachine/VMUndefinedArmTable.h"
+#include "MemCopy.h"
 
 #define DEFAULT_ROM_FILE_PATH           "/rom.gba"
 #define BIOS_FILE_PATH                  "/_gba/bios.bin"
@@ -201,6 +202,24 @@ static void loadGbaRom(const char* romPath)
     {
         gLogger->Log(LogLevel::Debug, "Bad mixer patch applied\n");
     }
+}
+
+static void loadGbaCart()
+{
+    mem_setGbaCartridgeRamWait(EXMEMCNT_SLOT2_RAM_WAIT_10);
+    mem_setGbaCartridgeRomWaits(EXMEMCNT_SLOT2_ROM_WAIT1_10, EXMEMCNT_SLOT2_ROM_WAIT2_6);
+    mem_setGbaCartridgePhi(EXMEMCNT_SLOT2_PHI_LOW);
+    mem_setGbaCartridgeCpu(EXMEMCNT_SLOT2_CPU_ARM9);
+
+    mem_copy32((GbaHeader*)0x08000000u, &gRomHeader, sizeof(GbaHeader));
+    mem_copy32((void*)0x08000000u, (void*)ROM_LINEAR_DS_ADDRESS, ROM_LINEAR_SIZE);
+    sdc_init();
+
+    HarvestMoonPatches().TryApplyPatches(gRomHeader.gameCode);
+    if (BadMixerPatch().TryApplyPatch())
+    {
+        gLogger->Log(LogLevel::Debug, "Bad mixer patch applied\n");
+    } 
 }
 
 static void disableSramReads(void)
@@ -447,7 +466,10 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     relocateGbaBios();
     applyBiosVmPatches();
     const char* romPath = argc > 1 ? argv[1] : DEFAULT_ROM_FILE_PATH;
-    loadGbaRom(romPath);
+    
+    loadGbaCart();
+    //loadGbaRom(romPath);
+
     char* romExtension = strrchr(romPath, '.');
     if (romExtension)
     {

@@ -6,12 +6,18 @@
 #include "SaveFlash.h"
 #include "SaveSram.h"
 #include "SaveTagScanner.h"
+#include "MemoryEmulator/RomDefs.h"
+#include "MemCopy.h"
 
 #define SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE  (SAVE_TAG_SCANNER_TEMP_BUFFER_SIZE >> 1)
 
-#define TAG_START_FLAS  0x53414C46
-#define TAG_START_SRAM  0x4D415253
-#define TAG_START_EEPR  0x52504545
+#define TAG_START_FLAS  0x464C4153 
+#define TAG_START_SRAM  0x5352414D
+#define TAG_START_EEPR  0x45455052
+
+#define TAG_START_FLAS_SWAP  0x53414C46 
+#define TAG_START_SRAM_SWAP  0x4D415253
+#define TAG_START_EEPR_SWAP  0x52504545
 
 static constexpr auto sSaveTypeInfos = std::to_array<const SaveTypeInfo>
 ({
@@ -46,33 +52,53 @@ static constexpr auto sSaveTypeInfos = std::to_array<const SaveTypeInfo>
     {"SRAM_V113", 10, SAVE_TYPE_SRAM_V113, 32 * 1024, sram_patchV111},
 });
 
+void SaveTagScanner::fillDebugBuf(void* buf, u32 size, const char* filePath)
+{
+    FIL gDebugBuf;
+    memset(&gDebugBuf, 0, sizeof(gDebugBuf));
+    if (f_open(&gDebugBuf, filePath, FA_OPEN_EXISTING | FA_READ | FA_WRITE) == FR_OK)
+    {
+        f_lseek(&gDebugBuf, 0);
+        for (u32 i = 0; i < size; ++i)
+        {
+            const u32 data = *(u32*)(void*)(buf + i);
+            UINT written = 0;
+            f_write(&gDebugBuf, &data, 1, &written);
+        }
+        f_sync(&gDebugBuf);
+    } else if (f_open(&gDebugBuf, filePath, FA_CREATE_NEW | FA_OPEN_EXISTING | FA_READ | FA_WRITE) == FR_OK){
+        f_lseek(&gDebugBuf, 0);
+        for (u32 i = 0; i < size; ++i)
+        {
+            const u32 data = *(u32*)(void*)(buf + i);
+            UINT written = 0;
+            f_write(&gDebugBuf, &data, 1, &written);
+        }
+        f_sync(&gDebugBuf);
+    }
+}
+
 const SaveTypeInfo* SaveTagScanner::FindSaveTag(FIL* romFile, u8* tempBuffer, u32& tagRomAddress)
 {
     tagRomAddress = 0;
-    f_rewind(romFile);
-    UINT read;
     u32 curAddr = 0;
-    if (f_read(romFile, tempBuffer, SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE, &read) != FR_OK)
-    {
-        return nullptr;
-    }
     int searchBufPtr = 0;
-    while (curAddr < f_size(romFile))
+    int ptrIncrement = 0;
+
+    mem_copy32((void*)(0x08000000 + ptrIncrement), tempBuffer, SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE);
+    ptrIncrement += SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE;
+
+    while (curAddr < 0x2000000) //32mb
     {
         if (searchBufPtr == 0)
         {
-            if (f_read(romFile, tempBuffer + SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE,
-                SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE, &read) != FR_OK)
-            {
-                return nullptr;
-            }
+            mem_copy32((void*)(0x08000000 + ptrIncrement), tempBuffer + SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE, SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE);
+            ptrIncrement += SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE;
         }
         else if (searchBufPtr == SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE)
         {
-            if (f_read(romFile, tempBuffer, SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE, &read) != FR_OK)
-            {
-                return nullptr;
-            }
+            mem_copy32((void*)(0x08000000 + ptrIncrement), tempBuffer, SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE);
+            ptrIncrement += SAVE_TAG_SCANNER_TEMP_BUFFER_HALF_SIZE;
         }
 
         SaveType saveType = IdentifySaveTypeFromFirst4TagBytes(*(u32*)&tempBuffer[searchBufPtr]);
@@ -93,17 +119,17 @@ const SaveTypeInfo* SaveTagScanner::FindSaveTag(FIL* romFile, u8* tempBuffer, u3
 
 SaveType SaveTagScanner::IdentifySaveTypeFromFirst4TagBytes(u32 first4TagBytes)
 {
-    switch (first4TagBytes)
+    switch (first4TagBytes) // Reading from slot2 has everything in Little Endian? 
     {
-        case TAG_START_FLAS:
-        {
+        case TAG_START_FLAS_SWAP:
+        {   
             return SAVE_TYPE_FLASH;
         }
-        case TAG_START_SRAM:
+        case TAG_START_SRAM_SWAP:
         {
             return SAVE_TYPE_SRAM;
         }
-        case TAG_START_EEPR:
+        case TAG_START_EEPR_SWAP:
         {
             return SAVE_TYPE_EEPROM;
         }
@@ -111,7 +137,27 @@ SaveType SaveTagScanner::IdentifySaveTypeFromFirst4TagBytes(u32 first4TagBytes)
         {
             return SAVE_TYPE_NONE;
         }
-    }
+    } 
+    //switch (first4TagBytes)
+    //{
+    //    case TAG_START_FLAS:
+    //    {
+    //        return SAVE_TYPE_FLASH;
+    //    }
+    //    case TAG_START_SRAM:
+    //    {
+    //        return SAVE_TYPE_SRAM;
+    //    }
+    //    case TAG_START_EEPR:
+    //    {
+    //        return SAVE_TYPE_EEPROM;
+    //    }
+    //    default:
+    //    {
+    //        return SAVE_TYPE_NONE;
+    //    }
+    //}
+    
 }
 
 const SaveTypeInfo* SaveTagScanner::GetSaveTypeInfoFromTag(SaveType saveType, const u8* tempBuffer, u32 searchBufPtr)
