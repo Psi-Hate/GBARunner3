@@ -28,40 +28,6 @@ gba_save_shared_t gGbaSaveShared;
 static DWORD sClusterTable[64];
 static u32 sSkipSaveCheckInstruction;
 
-bool sav_tryPatchFunction(const u32* signature, u32 saveSwiNumber, void* patchFunction)
-{
-    u32 cur = *(u32*)(void*)(0x08000000u + 0x1DFB3C);
-    u32 cur2 = *(u32*)(void*)(ROM_LINEAR_DS_ADDRESS + 0x1DFB3C);
-    //if(cur == 0x4A07B510u && cur2 == 0x4A07B510u) while(1);
-    u32* function = (u32*)mem_fastSearch16((const u32*)ROM_LINEAR_DS_ADDRESS, ROM_LINEAR_SIZE, signature);
-    if (!function) {
-        //while(1);
-        return false;
-    }
-    sav_swiTable[saveSwiNumber] = patchFunction;
-    *(u16*)function = SAVE_THUMB_SWI(saveSwiNumber);
-    return true;
-}
-
-static void loadSaveClusterMap(void)
-{
-    sClusterTable[0] = sizeof(sClusterTable) / sizeof(DWORD);
-    gSaveFile.cltbl = sClusterTable;
-    f_lseek(&gSaveFile, CREATE_LINKMAP);
-}
-
-static void fillSaveFile(u32 start, u32 end)
-{
-    const u8 saveFill = SAVE_DATA_FILL;
-    f_lseek(&gSaveFile, start);
-    for (u32 i = start; i < end; ++i)
-    {
-        UINT written = 0;
-        f_write(&gSaveFile, &saveFill, 1, &written);
-    }
-    f_sync(&gSaveFile);
-}
-
 void fillDebugBuf(void* buf, u32 size, const char* filePath)
 {
     FIL gDebugBuf;
@@ -86,6 +52,36 @@ void fillDebugBuf(void* buf, u32 size, const char* filePath)
         }
         f_sync(&gDebugBuf);
     }
+}
+
+bool sav_tryPatchFunction(const u32* signature, u32 saveSwiNumber, void* patchFunction)
+{
+    u32* function = (u32*)mem_fastSearch16((const u32*)ROM_LINEAR_DS_ADDRESS, ROM_LINEAR_SIZE, signature);
+    if (!function) {
+        return false;
+    }
+    sav_swiTable[saveSwiNumber] = patchFunction;
+    *(u16*)function = SAVE_THUMB_SWI(saveSwiNumber);
+    return true;
+}
+
+static void loadSaveClusterMap(void)
+{
+    sClusterTable[0] = sizeof(sClusterTable) / sizeof(DWORD);
+    gSaveFile.cltbl = sClusterTable;
+    f_lseek(&gSaveFile, CREATE_LINKMAP);
+}
+
+static void fillSaveFile(u32 start, u32 end)
+{
+    const u8 saveFill = SAVE_DATA_FILL;
+    f_lseek(&gSaveFile, start);
+    for (u32 i = start; i < end; ++i)
+    {
+        UINT written = 0;
+        f_write(&gSaveFile, &saveFill, 1, &written);
+    }
+    f_sync(&gSaveFile);
 }
 
 void sav_initializeSave(const SaveTypeInfo* saveTypeInfo, const char* savePath)

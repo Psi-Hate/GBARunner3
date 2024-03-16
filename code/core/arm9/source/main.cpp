@@ -50,6 +50,7 @@
 #define BIOS_FILE_PATH                  "/_gba/bios.bin"
 #define SETTINGS_FILE_PATH              "/_gba/gbarunner3.json"
 #define GAME_SETTINGS_FILE_PATH_FORMAT  "/_gba/configs/%c%c%c%c%02X.json"
+#define CART_SAVE_FILE_PATH_FORMAT  "/_gba/cart_sav/%c%c%c%c%c%c%c%c%02X.sav"
 
 [[gnu::section(".ewram.bss")]]
 FATFS gFatFs;
@@ -278,6 +279,24 @@ static void handleSave(const char* savePath)
         }
     }
 
+    char newSavePath[25];
+
+    if(savePath == DEFAULT_ROM_FILE_PATH){
+        mini_snprintf((char*)newSavePath, 39, CART_SAVE_FILE_PATH_FORMAT,
+            gRomHeader.gameCode & 0xFF, (gRomHeader.gameCode >> 8) & 0xFF,
+            (gRomHeader.gameCode >> 16) & 0xFF, gRomHeader.gameCode >> 24,
+            gRomHeader.softwareVersion, gRomHeader.gameTitle[0], gRomHeader.gameTitle[1], gRomHeader.gameTitle[2], gRomHeader.gameTitle[3],
+            gRomHeader.gameTitle[4]);
+        
+        for(int i = 0; i < 35; i++){  
+            if(newSavePath[i] == 0x2E && newSavePath[i+1] == 0x73 && newSavePath[i+2] == 0x61 && newSavePath[i+3] == 0x76) break;
+            if(newSavePath[i] == 0x20 || newSavePath[i] == 0x0 ||  newSavePath[i] == 0x02){
+                newSavePath[i] = 0x5F;
+            }
+        }
+        savePath =  (const char*)newSavePath;
+    }
+
     sav_initializeSave(saveTypeInfo, savePath);
 }
 
@@ -466,7 +485,7 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     relocateGbaBios();
     applyBiosVmPatches();
     const char* romPath = argc > 1 ? argv[1] : DEFAULT_ROM_FILE_PATH;
-    
+
     loadGbaCart();
     //loadGbaRom(romPath);
 
