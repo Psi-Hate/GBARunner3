@@ -7,6 +7,7 @@
 #include "Cpsr.h"
 #include "SdCache.h"
 #include "MemCopy.h"
+#include "Slot2.h"
 
 typedef struct
 {
@@ -99,6 +100,16 @@ static u32 getSdSectorOfRomBlock(u32 romBlock)
 /// @param dst The destination buffer.
 static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
 {
+    // If using SLOT2, we don't need to unscramble our romblock cache. 
+    u32 sector = 0;
+    if(!checkSlot2()) {
+        sector = getSdSectorOfRomBlock(romBlock);
+        if (sector == 0)
+        {
+            return &sdc_cache[0][0];
+        }
+    }
+
     u32 irqs = fs_waitForCompletionOfCurrentTransaction(true);
     if (isCurrentlyFetching())
     {
@@ -141,18 +152,29 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
         sdc_romBlockToCacheBlock[oldRomBlock] = NULL;
         sCacheBlockToRomBlock[cacheBlock] = SDC_ROM_BLOCK_INVALID;
     }
-
+    
+    // SLOT2 copies the block afterwards, rather than pulling from the SD Cache here.
+    FsWaitToken waitToken;
+    if(!checkSlot2()){
+        fs_readCacheAlignedSectorsAsync(
+            gFile.obj.fs->pdrv == DEV_FAT ? FS_DEVICE_DLDI : FS_DEVICE_DSI_SD,
+            &sdc_cache[cacheBlock][0], sector,
+            SDC_BLOCK_SIZE / 512, &waitToken);
+    } //else memset(&waitToken, 0, sizeof(FsWaitToken));
     sCurrentFetch.romBlock = romBlock;
     sCurrentFetch.cacheBlock = cacheBlock;
 
     if ((arm_getCpsr() & 0x1F) != 0x12)
     {
-        arm_disableIrqs();
+        if(checkSlot2()) arm_disableIrqs();
         sTabuBlock = cacheBlock;
     }
     arm_restoreIrqs(irqs);
-    mem_copy32((void*)(0x08000000 + (romBlock * SDC_BLOCK_SIZE)), &sdc_cache[cacheBlock][0], SDC_BLOCK_SIZE);
-    arm_disableIrqs();
+    if(checkSlot2()) mem_copy32((void*)(0x08000000 + (romBlock * SDC_BLOCK_SIZE)), &sdc_cache[cacheBlock][0], SDC_BLOCK_SIZE);
+    else irqs = fs_waitForCompletion(&waitToken, true);
+        
+    if(checkSlot2()) arm_restoreIrqs(irqs);
+    
     if (sCurrentFetch.romBlock == romBlock)
     {
         finishFetch();
@@ -210,11 +232,14 @@ void sdc_init(void)
     gSdCacheIrqForbiddenRomBlockReplacementRange = 0;
 
     sClusterTable[0] = sizeof(sClusterTable) / sizeof(DWORD);
-    //gFile.cltbl = sClusterTable;
-    //u32 result = f_lseek(&gFile, CREATE_LINKMAP);
-    //if (result != FR_OK)
-    //{
-    //    logAddress(0xDEADBEEF);
-    //    logAddress(result);
-    //}
+
+    if(!checkSlot2()){
+        gFile.cltbl = sClusterTable;
+        u32 result = f_lseek(&gFile, CREATE_LINKMAP);
+        if (result != FR_OK)
+        {
+            logAddress(0xDEADBEEF);
+            logAddress(result);
+        }
+    }
 }

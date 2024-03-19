@@ -45,12 +45,13 @@
 #include "MemoryEmulator/Arm/ArmDispatchTable.h"
 #include "VirtualMachine/VMUndefinedArmTable.h"
 #include "MemCopy.h"
+#include "Slot2.h"
 
 #define DEFAULT_ROM_FILE_PATH           "/rom.gba"
 #define BIOS_FILE_PATH                  "/_gba/bios.bin"
 #define SETTINGS_FILE_PATH              "/_gba/gbarunner3.json"
 #define GAME_SETTINGS_FILE_PATH_FORMAT  "/_gba/configs/%c%c%c%c%02X.json"
-#define CART_SAVE_FILE_PATH_FORMAT  "/_gba/cart_sav/%c%c%c%c%c%c%c%c%02X.sav"
+#define CART_SAVE_FILE_PATH_FORMAT  "/_gba/cart_sav/%c%c%c%c%c%c%02X.sav"
 
 [[gnu::section(".ewram.bss")]]
 FATFS gFatFs;
@@ -207,12 +208,8 @@ static void loadGbaRom(const char* romPath)
 
 static void loadGbaCart()
 {
-    mem_setGbaCartridgeRamWait(EXMEMCNT_SLOT2_RAM_WAIT_10);
-    mem_setGbaCartridgeRomWaits(EXMEMCNT_SLOT2_ROM_WAIT1_10, EXMEMCNT_SLOT2_ROM_WAIT2_6);
-    mem_setGbaCartridgePhi(EXMEMCNT_SLOT2_PHI_LOW);
-    mem_setGbaCartridgeCpu(EXMEMCNT_SLOT2_CPU_ARM9);
-
-    mem_copy32((GbaHeader*)0x08000000u, &gRomHeader, sizeof(GbaHeader));
+    // SLOT2 should be accessable now, so we can copy data to Main Memory.
+    //mem_copy32((GbaHeader*)0x08000000u, &gRomHeader, sizeof(GbaHeader));
     mem_copy32((void*)0x08000000u, (void*)ROM_LINEAR_DS_ADDRESS, ROM_LINEAR_SIZE);
     sdc_init();
 
@@ -279,22 +276,25 @@ static void handleSave(const char* savePath)
         }
     }
 
-    char newSavePath[25];
 
-    if(savePath == DEFAULT_ROM_FILE_PATH){
-        mini_snprintf((char*)newSavePath, 39, CART_SAVE_FILE_PATH_FORMAT,
+    // Eventually the default functionality will be reading/writing savedata from the slot2 chip, and using the regular SD save method if A is Held at boot.
+    if(checkSlot2()) { 
+        // If using the SD card to handle saves for a SLOT2 game, we'll need to give the save a path.
+        // Format should be "XXXXYYYY.sav", where X is the game code and YYY are the beginning 3 letters of the title.
+        char newSavePath[25];
+        mini_snprintf((char*)newSavePath, 35, CART_SAVE_FILE_PATH_FORMAT,
             gRomHeader.gameCode & 0xFF, (gRomHeader.gameCode >> 8) & 0xFF,
             (gRomHeader.gameCode >> 16) & 0xFF, gRomHeader.gameCode >> 24,
             gRomHeader.softwareVersion, gRomHeader.gameTitle[0], gRomHeader.gameTitle[1], gRomHeader.gameTitle[2], gRomHeader.gameTitle[3],
             gRomHeader.gameTitle[4]);
-        
-        for(int i = 0; i < 35; i++){  
+        // Sanitize the file name from any forbidden characters. This is stupid I'll do it better later.
+        for(int i = 0; i < 31; i++){  
             if(newSavePath[i] == 0x2E && newSavePath[i+1] == 0x73 && newSavePath[i+2] == 0x61 && newSavePath[i+3] == 0x76) break;
             if(newSavePath[i] == 0x20 || newSavePath[i] == 0x0 ||  newSavePath[i] == 0x02){
                 newSavePath[i] = 0x5F;
             }
         }
-        savePath =  (const char*)newSavePath;
+        savePath = (const char*)newSavePath;
     }
 
     sav_initializeSave(saveTypeInfo, savePath);
@@ -486,8 +486,12 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     applyBiosVmPatches();
     const char* romPath = argc > 1 ? argv[1] : DEFAULT_ROM_FILE_PATH;
 
-    loadGbaCart();
-    //loadGbaRom(romPath);
+    // Load the ROM, or the SLOT2 cart if applicable.
+    if(checkSlot2()){
+        loadGbaCart();
+    } else {
+        loadGbaRom(romPath);
+    }
 
     char* romExtension = strrchr(romPath, '.');
     if (romExtension)

@@ -10,7 +10,6 @@ class SaveTagScanner
     const SaveTypeInfo* GetSaveTypeInfoFromTag(SaveType saveType, const u8* tempBuffer, u32 searchBufPtr);
     
 public:
-    void fillDebugBuf(void* buf, u32 size, const char* filePath);
     /// @brief Scans the given romFile for known save tags.
     /// @param romFile The rom file to scan.
     /// @param tempBuffer A temporarily buffer of SAVE_TAG_SCANNER_TEMP_BUFFER_SIZE used for scanning.
