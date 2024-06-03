@@ -27,6 +27,7 @@ gba_save_shared_t gGbaSaveShared;
 
 static DWORD sClusterTable[64];
 static u32 sSkipSaveCheckInstruction;
+extern bool gSlot2Active;
 
 void fillDebugBuf(void* buf, u32 size, const char* filePath)
 {

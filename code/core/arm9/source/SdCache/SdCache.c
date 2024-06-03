@@ -38,6 +38,8 @@ static DWORD sClusterTable[512];
 // temporarily
 extern FIL gFile;
 
+extern bool gSlot2Active;
+
 /// @brief Returns a cache block to replace.
 /// @return The index of the cache block to replace.
 static u32 getBlockToReplace(void)
@@ -102,7 +104,7 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
 {
     // If using SLOT2, we don't need to unscramble our romblock cache. 
     u32 sector = 0;
-    if(!checkSlot2()) {
+    if(!gSlot2Active) {
         sector = getSdSectorOfRomBlock(romBlock);
         if (sector == 0)
         {
@@ -155,7 +157,7 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
     
     // SLOT2 copies the block afterwards, rather than pulling from the SD Cache here.
     FsWaitToken waitToken;
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         fs_readCacheAlignedSectorsAsync(
             gFile.obj.fs->pdrv == DEV_FAT ? FS_DEVICE_DLDI : FS_DEVICE_DSI_SD,
             &sdc_cache[cacheBlock][0], sector,
@@ -166,14 +168,14 @@ static void* loadRomBlock(u32 romBlock, u32 cacheBlock)
 
     if ((arm_getCpsr() & 0x1F) != 0x12)
     {
-        if(checkSlot2()) arm_disableIrqs();
+        if(gSlot2Active) arm_disableIrqs();
         sTabuBlock = cacheBlock;
     }
     arm_restoreIrqs(irqs);
-    if(checkSlot2()) mem_copy32((void*)(0x08000000 + (romBlock * SDC_BLOCK_SIZE)), &sdc_cache[cacheBlock][0], SDC_BLOCK_SIZE);
+    if(gSlot2Active) mem_copy32((void*)(0x08000000 + (romBlock * SDC_BLOCK_SIZE)), &sdc_cache[cacheBlock][0], SDC_BLOCK_SIZE);
     else irqs = fs_waitForCompletion(&waitToken, true);
         
-    if(checkSlot2()) arm_restoreIrqs(irqs);
+    if(gSlot2Active) arm_restoreIrqs(irqs);
     
     if (sCurrentFetch.romBlock == romBlock)
     {
@@ -233,7 +235,7 @@ void sdc_init(void)
 
     sClusterTable[0] = sizeof(sClusterTable) / sizeof(DWORD);
 
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         gFile.cltbl = sClusterTable;
         u32 result = f_lseek(&gFile, CREATE_LINKMAP);
         if (result != FR_OK)

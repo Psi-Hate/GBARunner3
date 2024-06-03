@@ -16,6 +16,8 @@
 #define TAG_START_SRAM  0x4D415253
 #define TAG_START_EEPR  0x52504545
 
+extern bool gSlot2Active;
+
 static constexpr auto sSaveTypeInfos = std::to_array<const SaveTypeInfo>
 ({
     {"EEPROM_V111", 12, SAVE_TYPE_EEPROM_V111, 512, eeprom_patchV111},
@@ -52,7 +54,7 @@ static constexpr auto sSaveTypeInfos = std::to_array<const SaveTypeInfo>
 const SaveTypeInfo* SaveTagScanner::FindSaveTag(FIL* romFile, u8* tempBuffer, u32& tagRomAddress)
 {
     // This is a bit messy but it works for now.
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         tagRomAddress = 0;
         f_rewind(romFile);
         UINT read;

@@ -78,6 +78,7 @@ static PlainLogger sPlainLogger { LogLevel::All, &sIsNitroOutput };
 static NullLogger sNullLogger;
 ILogger* gLogger;
 static SplashScreen* sSplashScreen;
+extern bool gSlot2Active;
 
 static void setupLogger()
 {
@@ -278,7 +279,7 @@ static void handleSave(const char* savePath)
 
 
     // Eventually the default functionality will be reading/writing savedata from the slot2 chip, and using the regular SD save method if A is Held at boot.
-    if(checkSlot2()) { 
+    if(gSlot2Active && savePath == DEFAULT_ROM_FILE_PATH) { 
         // If using the SD card to handle saves for a SLOT2 game, we'll need to give the save a path.
         // Format should be "XXXXYYYY.sav", where X is the game code and YYY are the beginning 3 letters of the title.
         char newSavePath[25];
@@ -487,7 +488,7 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     const char* romPath = argc > 1 ? argv[1] : DEFAULT_ROM_FILE_PATH;
 
     // Load the ROM, or the SLOT2 cart if applicable.
-    if(checkSlot2()){
+    if(checkSlot2() && romPath == DEFAULT_ROM_FILE_PATH){
         loadGbaCart();
     } else {
         loadGbaRom(romPath);

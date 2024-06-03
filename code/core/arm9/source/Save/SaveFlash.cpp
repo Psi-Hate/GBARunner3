@@ -37,6 +37,8 @@ static flash_patchinfo_t sPatchInfo;
 static flash_v120_type sFlashType;
 static const u16 sMaxTime[] = { 0xA, 0xFFBD, 0xC2, 0xA, 0xFFBD, 0xC2, 0x28, 0xFFBD, 0xC2, 0xC8, 0xFFBD, 0xC2 };
 
+extern bool gSlot2Active;
+
 static void readFlash(u16 secNo, u32 offset, u8* dst, u32 size)
 {
     u32 saveAddress = (secNo << 12) + offset;
@@ -276,7 +278,7 @@ bool flash_patchV126(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomA
 
 bool flash_patch512V130(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
         {
             return false;
@@ -309,7 +311,7 @@ bool flash_patch512V130(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagR
 
 bool flash_patch1MV102(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
         {
             return false;
@@ -347,7 +349,7 @@ bool flash_patch1MV102(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRo
 
 bool flash_patch1MV103(const SaveTypeInfo* saveTypeInfo, FIL* romFile, u32 tagRomAddress, u8* tempBuffer)
 {
-    if(!checkSlot2()){
+    if(!gSlot2Active){
         if (f_lseek(romFile, tagRomAddress + ((saveTypeInfo->tagLength + 3) & ~3)) != FR_OK)
         {
             return false;

@@ -8,11 +8,13 @@
 
 bool gSlot2Active = false;
 bool gSaveInternal = false;
+//bool gSDRomActive = true;
 
 extern GbaHeader gRomHeader;
 
 // Checks if SLOT2 holds a game cart.
 extern "C" bool checkSlot2(){
+    //if(gSDRomActive) return !gSDRomActive;
     if(gSlot2Active) return gSlot2Active;
     mem_setGbaCartridgeRamWait(EXMEMCNT_SLOT2_RAM_WAIT_10);
     mem_setGbaCartridgeRomWaits(EXMEMCNT_SLOT2_ROM_WAIT1_10, EXMEMCNT_SLOT2_ROM_WAIT2_6);
