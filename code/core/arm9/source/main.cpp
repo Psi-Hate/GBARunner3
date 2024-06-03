@@ -491,6 +491,7 @@ extern "C" void gbaRunnerMain(int argc, char* argv[])
     if(checkSlot2() && romPath == DEFAULT_ROM_FILE_PATH){
         loadGbaCart();
     } else {
+        gSlot2Active = false;
         loadGbaRom(romPath);
     }
 
